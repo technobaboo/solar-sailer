@@ -1,7 +1,8 @@
-mod root;
+mod solar_sailer;
 
+use libmonado_rs::Monado;
 use manifest_dir_macros::directory_relative_path;
-use root::ClientRoot;
+use solar_sailer::SolarSailer;
 use stardust_xr_fusion::{client::Client, node::NodeType, root::RootAspect};
 
 #[tokio::main(flavor = "current_thread")]
@@ -12,10 +13,11 @@ async fn main() {
 		.set_base_prefixes(&[directory_relative_path!("res")])
 		.unwrap();
 
+	let monado = Monado::auto_connect().expect("Couldn't connect to monado :(");
 	let _wrapped = client
 		.get_root()
 		.alias()
-		.wrap(ClientRoot::new(&client).await.unwrap())
+		.wrap(SolarSailer::new(monado, &client, 0.005).unwrap())
 		.unwrap();
 
 	tokio::select! {

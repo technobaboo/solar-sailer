@@ -5,9 +5,10 @@ edition = "2021"
 
 [dependencies]
 color-eyre = "0.6.2"
-glam = "0.25.0"
+glam = "0.27.0"
 manifest-dir-macros = "0.1.18"
 mint = "0.5.9"
+send_wrapper = "0.6.0"
 tokio = { version = "1.32.0", features = ["rt", "tokio-macros", "sync"] }
 
 [dependencies.stardust-xr-fusion]
@@ -17,3 +18,6 @@ branch = "dev"
 [dependencies.stardust-xr-molecules]
 git = "https://github.com/StardustXR/molecules.git"
 branch = "dev"
+
+[dependencies.libmonado-rs]
+git = "https://github.com/technobaboo/libmonado-rs.git"
