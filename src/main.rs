@@ -4,12 +4,10 @@ mod monado_movement;
 mod reparentable_movement;
 mod solar_sailer;
 
+use gluon::Liveness;
 use input::Input;
 use solar_sailer::{Mode, SolarSailer};
-use stardust_xr_fusion::{
-	client::Client,
-	project_local_resources,
-};
+use stardust_xr_fusion::{client::Client, project_local_resources};
 use tokio::sync::broadcast::error::RecvError;
 
 pub const APP_ID: &str = "org.stardustxr.SolarSailer";
@@ -26,13 +24,19 @@ async fn main() {
 
 	let input = Input::new_pen(&client).await.unwrap();
 
-	let mut solar_sailer = SolarSailer::new(&client,  input).await;
+	let mut solar_sailer = SolarSailer::new(&client, input).await;
 	let mut recv = client.frame_receiver();
+	let server = client.server();
 	loop {
-		let info = match recv.recv().await {
-			Ok(info) => info,
-			Err(RecvError::Closed) => break,
-			Err(RecvError::Lagged(_)) => continue,
+		let info = tokio::select! {
+			f = recv.recv() => {
+				match f {
+					Ok(info) => info,
+					Err(RecvError::Closed) => break,
+					Err(RecvError::Lagged(_)) => continue,
+				}
+			}
+			_ = server.death_notification() => break,
 		};
 
 		solar_sailer.handle_input(&client).await;

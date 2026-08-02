@@ -28,7 +28,7 @@ impl SolarSailer {
 				None
 			}
 		};
-		let monado_movement = MonadoMovement::from_monado(&client, monado).await;
+		let monado_movement = MonadoMovement::from_monado(client, monado).await;
 
 		SolarSailer {
 			mode: match monado_movement.is_some() {
@@ -37,7 +37,7 @@ impl SolarSailer {
 			},
 			monado_movement,
 			input,
-			reparent_movement: ReparentMovement::new(&client).await.unwrap(),
+			reparent_movement: ReparentMovement::new(client).await.unwrap(),
 			velocity: Vec3::ZERO,
 			moving: false,
 		}
@@ -46,7 +46,7 @@ impl SolarSailer {
 		self.input.update_mode()
 	}
 	pub fn handle_input(&mut self, client: &Client<impl ClientHandler>) -> impl Future {
-		self.input.handle_input(&client)
+		self.input.handle_input(client)
 	}
 	pub async fn apply_offset(&mut self, client: &Client<impl ClientHandler>, delta_secs: f32) {
 		let vel_ref = &self.input.get_velocity_space();

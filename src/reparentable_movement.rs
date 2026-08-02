@@ -4,7 +4,7 @@ use glam::{Affine3A, Vec3};
 use gluon::{Handler, Object};
 use stardust_xr_fusion::{
 	client::{Client, ClientHandler},
-	fields::{Field, FieldExt, FieldRef, Shape},
+	fields::{Field, FieldExt, FieldRef, FieldSample, Shape},
 	query::{InterfaceDependency, QueriedInterface, QueryableObjectRef},
 	spatial::{Spatial, SpatialExt, SpatialRef, Transform},
 	spatial_query::{SpatialQueryGuard, ZoneQuery, ZoneQueryHandler, ZoneQueryHandlerHandler},
@@ -46,7 +46,7 @@ impl ZoneQueryHandlerHandler for Reparent {
 		_spatial: SpatialRef,
 		interfaces: Vec<QueriedInterface>,
 		_relative_position: Vec3F,
-		_distance: f32,
+		_sample: FieldSample,
 	) {
 		let reparentable = ReparentableProxy::from_object_or_ref(interfaces[0].interface.clone());
 		let Ok(Some(handle)) = reparentable
@@ -75,7 +75,7 @@ impl ZoneQueryHandlerHandler for Reparent {
 		_ctx: gluon::Context,
 		_obj: QueryableObjectRef,
 		_relative_position: Vec3F,
-		_distance: f32,
+		_sample: FieldSample,
 	) -> impl Future<Output = ()> + Send + Sync {
 		ready(())
 	}
@@ -121,7 +121,7 @@ impl Reparent {
 			.await
 			.ok()?
 			.ok()?;
-		reparent.guard.set(query);
+		_ = reparent.guard.set(query);
 
 		Some(reparent)
 	}

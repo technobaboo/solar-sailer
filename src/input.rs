@@ -1,4 +1,7 @@
-use std::{f32::consts::FRAC_PI_2, process};
+use std::{
+	f32::consts::{FRAC_PI_2, FRAC_PI_4},
+	process,
+};
 
 use glam::{Mat4, Quat, Vec3, vec3};
 use stardust_xr_fusion::{
@@ -34,6 +37,7 @@ pub struct PenInput {
 	pen_root: Spatial,
 	queue: InputQueue,
 	prev_position: Option<Vec3>,
+	pointer_distance: f32,
 	signifiers: Lines,
 	root: SpatialRef,
 	button: Button,
@@ -52,6 +56,7 @@ pub struct GrabInput {
 	field_spatial: Spatial,
 	queue: InputQueue,
 	prev_position: Option<Vec3>,
+	pointer_distance: f32,
 	signifiers: Lines,
 	velocity_space: SpatialRef,
 	button_hand: Option<ModeButton>,
@@ -81,6 +86,7 @@ impl Input {
 			_field: field,
 			queue,
 			prev_position: None,
+			pointer_distance: 0.0,
 			velocity_space: client.root().clone(),
 			button_hand: None,
 			button_controller: None,
@@ -177,7 +183,7 @@ impl PenInput {
 		)
 		.await?;
 
-		let derezzable = Derezzable::new(&client, field_spatial.clone(), field.clone()).await?;
+		let derezzable = Derezzable::new(client, field_spatial.clone(), field.clone()).await?;
 		let mut pen = Self {
 			move_action: Default::default(),
 			grab_action: Default::default(),
@@ -185,6 +191,7 @@ impl PenInput {
 			pen_root,
 			queue,
 			prev_position: None,
+			pointer_distance: 0.0,
 			signifiers,
 			root: client.root().clone(),
 			button,
@@ -213,7 +220,7 @@ impl PenInput {
 		.ok();
 	}
 	async fn handle_input(&mut self, client: &Client<impl ClientHandler>) {
-		if let Ok(_) = self.derezzable.receiver.try_recv() {
+		if self.derezzable.receiver.try_recv().is_ok() {
 			process::exit(0);
 		}
 		if !self.queue.handle_events() {
@@ -226,7 +233,7 @@ impl PenInput {
 			|data| match &data.input() {
 				InputDataType::Hand { data: _ } => data.datamap_f32("grab_strength") > 0.80,
 				InputDataType::Tip { data: _ } => data.datamap_f32("grab") > 0.90,
-				_ => false,
+				InputDataType::Pointer { data: _ } => data.datamap_f32("grab") > 0.90,
 			},
 		);
 		self.move_action
@@ -234,7 +241,7 @@ impl PenInput {
 				// TODO: tune
 				InputDataType::Hand { data: _ } => data.datamap_f32("pinch_strength") > 0.9,
 				InputDataType::Tip { data: _ } => data.datamap_f32("select") > 0.01,
-				_ => false,
+				InputDataType::Pointer { data: _ } => data.datamap_f32("select") > 0.01,
 			});
 
 		if self.grab_action.actor_started() {
@@ -256,7 +263,19 @@ impl PenInput {
 				t.pose.position,
 				Quat::from(t.pose.orientation) * Quat::from_rotation_x(FRAC_PI_2),
 			),
-			_ => PartialTransform::NONE,
+			InputDataType::Pointer { data: p } => {
+				if self.grab_action.actor_started() {
+					// deepest_point is already a distance along the ray
+					self.pointer_distance = p.deepest_point;
+				} else {
+					self.pointer_distance += (grab_actor.datamap_vec2("scroll_continuous").y * 0.01) + // continuous +Y -> 1cm farther away
+						(grab_actor.datamap_vec2("scroll_discrete").y * 0.1); // discrete +Y -> 10cm farther away
+				}
+				PartialTransform::from_translation_rotation(
+					Vec3::from(p.pose.position) + Vec3::from(p.direction()) * self.pointer_distance,
+					Quat::from(p.pose.orientation) * Quat::from_rotation_z(-FRAC_PI_4),
+				)
+			}
 		};
 		let _ = self
 			.pen_root
@@ -267,11 +286,13 @@ impl PenInput {
 			self.prev_position = None;
 			return Vec3::ZERO;
 		};
-		let position = Vec3::from(match &grab_actor.input() {
-			InputDataType::Hand { data: h } => h.palm.pose.position,
-			InputDataType::Tip { data: t } => t.pose.position,
-			_ => unreachable!(),
-		});
+		let position = match &grab_actor.input() {
+			InputDataType::Hand { data: h } => Vec3::from(h.palm.pose.position),
+			InputDataType::Tip { data: t } => Vec3::from(t.pose.position),
+			InputDataType::Pointer { data: p } => {
+				Vec3::from(p.pose.position) + Vec3::from(p.direction()) * self.pointer_distance
+			}
+		};
 
 		let root_transform = self
 			.field_spatial
@@ -340,18 +361,32 @@ impl GrabInput {
 		self.move_action.update(
 			true,
 			&self.queue,
-			|data| !matches!(&data.input(), InputDataType::Pointer { data: _ }),
+			|_data| true,
 			|data| match &data.input() {
 				InputDataType::Hand { data: _ } => data.datamap_f32("grab_strength") > 0.9,
 				_ => data.datamap_f32("grab") > 0.9,
 			},
 		);
+		let Some(actor) = self.move_action.actor() else {
+			return;
+		};
+		if let InputDataType::Pointer { data: p } = actor.input() {
+			if self.move_action.actor_started() {
+				// deepest_point is already a distance along the ray
+				self.pointer_distance = p.deepest_point;
+			} else {
+				self.pointer_distance += (actor.datamap_vec2("scroll_continuous").y * 0.01) + // continuous +Y -> 1cm farther away
+					(actor.datamap_vec2("scroll_discrete").y * 0.1); // discrete +Y -> 10cm farther away
+			}
+		}
 	}
 	pub async fn waft(&mut self, _delta_secs: f32) -> Vec3 {
 		let position = self.move_action.actor().map(|p| match &p.input() {
-			InputDataType::Hand { data: h } => h.palm.pose.position.into(),
-			InputDataType::Tip { data: t } => t.pose.position.into(),
-			_ => unreachable!(),
+			InputDataType::Hand { data: h } => Vec3::from(h.palm.pose.position),
+			InputDataType::Tip { data: t } => Vec3::from(t.pose.position),
+			InputDataType::Pointer { data: p } => {
+				Vec3::from(p.pose.position) + Vec3::from(p.direction()) * self.pointer_distance
+			}
 		});
 
 		if let Some(prev_position) = self.prev_position
@@ -396,7 +431,17 @@ impl GrabInput {
 	}
 	fn generate_signifier(&self, input: &InputSnapshot, grabbing: bool, mode: Mode) -> Line {
 		let transform = match &input.input() {
-			InputDataType::Pointer { data: _ } => panic!("awawawawawawa"),
+			InputDataType::Pointer { data: p } => {
+				let distance = if grabbing {
+					self.pointer_distance
+				} else {
+					p.deepest_point
+				};
+				Mat4::from_rotation_translation(
+					p.pose.orientation.into(),
+					(Vec3::from(p.pose.position) + Vec3::from(p.direction()) * distance).into(),
+				)
+			}
 			InputDataType::Hand { data: h } => {
 				Mat4::from_rotation_translation(
 					h.palm.pose.orientation.into(),
@@ -413,7 +458,7 @@ impl GrabInput {
 			64,
 			0.0,
 			match &input.input() {
-				InputDataType::Pointer { data: _ } => panic!("awawawawawawa"),
+				InputDataType::Pointer { data: _ } => 0.0025,
 				InputDataType::Hand { data: _ } => 0.1,
 				InputDataType::Tip { data: _ } => 0.0025,
 			},
