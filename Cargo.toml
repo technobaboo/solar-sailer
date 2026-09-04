@@ -10,17 +10,18 @@ tokio = { version = "1.32.0", features = ["rt", "tokio-macros", "sync"] }
 tracing = "0.1.41"
 tokio-stream = "0.1.17"
 tracing-subscriber = { version = "0.3.19", features = ["tracing"] }
-# stardust-xr-fusion = "0.50.0"
-# stardust-xr-molecules = "0.50.0"
-gluon.git = "https://github.com/technobaboo/gluon"
+
+[dependencies.gluon]
+git = "https://github.com/technobaboo/gluon.git"
+branch = "refactor/strongipc"
 
 [dependencies.stardust-xr-fusion]
 git = "https://github.com/StardustXR/core.git"
-branch = "binder"
+branch = "refactor/strongipc"
 
 [dependencies.stardust-xr-molecules]
 git = "https://github.com/StardustXR/molecules.git"
-branch = "binder"
+branch = "refactor/strongipc"
 
 [dependencies.libmonado]
 git = "https://github.com/technobaboo/libmonado-rs.git"

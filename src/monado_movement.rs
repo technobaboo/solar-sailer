@@ -63,14 +63,11 @@ impl MonadoMovement {
 		}
 	}
 
-	pub async fn from_monado(
-		client: &Client<impl ClientHandler>,
-		monado: Option<Monado>,
-	) -> Option<Self> {
+	pub async fn from_monado(monado: Option<Monado>) -> Option<Self> {
 		let monado = monado?;
 		Some(MonadoMovement {
 			monado,
-			stage: Tracked::stage_spatial(client).await.ok()?,
+			stage: Tracked::stage_spatial().await.ok()?,
 		})
 	}
 }

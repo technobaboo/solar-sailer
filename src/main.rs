@@ -1,8 +1,8 @@
 mod input;
 mod mode_button;
 mod monado_movement;
-mod reparentable_movement;
 mod solar_sailer;
+mod translate_movement;
 
 use gluon::Liveness;
 use input::Input;
@@ -15,7 +15,7 @@ pub const APP_ID: &str = "org.stardustxr.SolarSailer";
 #[tokio::main(flavor = "current_thread")]
 async fn main() {
 	tracing_subscriber::fmt().pretty().with_file(false).init();
-	let (client, _) = Client::auto_connect(&[&project_local_resources!("data")])
+	let (client, _) = Client::connect(&[&project_local_resources!("data")])
 		.await
 		.unwrap();
 
@@ -39,7 +39,7 @@ async fn main() {
 			_ = server.death_notification() => break,
 		};
 
-		solar_sailer.handle_input(&client).await;
+		solar_sailer.handle_input().await;
 		let switch_mode = solar_sailer.should_switch_mode();
 		// if switch_mode {
 		// 	solar_sailer.mode = match solar_sailer.mode {
@@ -50,8 +50,8 @@ async fn main() {
 		// }
 		if switch_mode {
 			solar_sailer.switch_mode(match solar_sailer.current_mode() {
-				Mode::Reparent => Mode::MonadoOffset,
-				Mode::MonadoOffset => Mode::Reparent,
+				Mode::Translate => Mode::MonadoOffset,
+				Mode::MonadoOffset => Mode::Translate,
 				Mode::Disabled => Mode::MonadoOffset,
 			});
 		}

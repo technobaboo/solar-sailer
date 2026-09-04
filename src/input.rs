@@ -3,6 +3,11 @@ use std::{
 	process,
 };
 
+use crate::{
+	APP_ID,
+	mode_button::ModeButton,
+	solar_sailer::{Mode, mat_from_transform},
+};
 use glam::{Mat4, Quat, Vec3, vec3};
 use stardust_xr_fusion::{
 	client::{Client, ClientHandler},
@@ -16,22 +21,15 @@ use stardust_xr_fusion::{
 use stardust_xr_molecules::{
 	Derezzable, UIElement,
 	button::{Button, ButtonSettings},
+	container::Containable,
 	input_action::{InputQueue, InputSnapshot, SimpleAction, SingleAction},
 	lines::{LineExt as _, circle},
-	reparentable::Reparentable,
-};
-use tracing::error;
-
-use crate::{
-	APP_ID,
-	mode_button::ModeButton,
-	solar_sailer::{Mode, mat_from_transform},
 };
 
 pub struct PenInput {
 	move_action: SimpleAction,
 	grab_action: SingleAction,
-	field: Field,
+	_field: Field,
 	field_spatial: Spatial,
 	field_spatial_ref: SpatialRef,
 	pen_root: Spatial,
@@ -41,7 +39,7 @@ pub struct PenInput {
 	signifiers: Lines,
 	root: SpatialRef,
 	button: Button,
-	reparentable: Option<Reparentable>,
+	containable: Containable,
 	derezzable: Derezzable,
 	_button_model: Model,
 }
@@ -68,7 +66,7 @@ impl Input {
 		PenInput::new(client).await.map(Input::Pen)
 	}
 	pub async fn new_grab(client: &Client<impl ClientHandler>) -> stardust_xr_fusion::Result<Self> {
-		let hmd = Tracked::hmd_spatial(client).await?;
+		let hmd = Tracked::hmd_spatial().await?;
 		let (field_spatial, field_spatial_ref) =
 			Spatial::new(client, &hmd, Transform::IDENTITY).await?;
 		let (field, _) =
@@ -101,10 +99,10 @@ impl Input {
 			Input::Pen(pen_input) => pen_input.update_mode(),
 		}
 	}
-	pub async fn handle_input(&mut self, client: &Client<impl ClientHandler>) {
+	pub async fn handle_input(&mut self) {
 		match self {
 			Input::Grab(grab_input) => grab_input.handle_input(),
-			Input::Pen(pen_input) => pen_input.handle_input(client).await,
+			Input::Pen(pen_input) => pen_input.handle_input().await,
 		}
 	}
 	pub async fn waft(&mut self, delta_secs: f32) -> Vec3 {
@@ -184,10 +182,26 @@ impl PenInput {
 		.await?;
 
 		let derezzable = Derezzable::new(client, field_spatial.clone(), field.clone()).await?;
-		let mut pen = Self {
+		let containable = Containable::new(
+			client,
+			pen_root.clone(),
+			client.root().clone(),
+			field_spatial_ref.clone(),
+			|containers| {
+				containers
+					.values()
+					.filter(|(sample, _)| sample.distance < 0.0)
+					.max_by(|(a, _), (b, _)| a.distance.total_cmp(&b.distance))
+					.map(|(_, spatial)| spatial.clone())
+			},
+		)
+		.await?;
+		containable.set_auto_reparent(false);
+
+		Ok(Self {
 			move_action: Default::default(),
 			grab_action: Default::default(),
-			field,
+			_field: field,
 			pen_root,
 			queue,
 			prev_position: None,
@@ -195,31 +209,15 @@ impl PenInput {
 			signifiers,
 			root: client.root().clone(),
 			button,
-			reparentable: None,
+			containable,
 			derezzable,
 			field_spatial_ref,
 			field_spatial,
 
 			_button_model: button_model,
-		};
-		pen.make_reparentable(client).await;
-		Ok(pen)
+		})
 	}
-	async fn make_reparentable(&mut self, client: &Client<impl ClientHandler>) {
-		if self.reparentable.is_some() {
-			return;
-		}
-		self.reparentable = Reparentable::new(
-			client,
-			self.pen_root.clone(),
-			self.root.clone(),
-			self.field.clone(),
-		)
-		.await
-		.inspect_err(|err| error!("unable to make reparentable: {err}"))
-		.ok();
-	}
-	async fn handle_input(&mut self, client: &Client<impl ClientHandler>) {
+	async fn handle_input(&mut self) {
 		if self.derezzable.receiver.try_recv().is_ok() {
 			process::exit(0);
 		}
@@ -244,11 +242,8 @@ impl PenInput {
 				InputDataType::Pointer { data: _ } => data.datamap_f32("select") > 0.01,
 			});
 
-		if self.grab_action.actor_started() {
-			self.reparentable.take();
-		}
 		if self.grab_action.actor_stopped() {
-			self.make_reparentable(client).await;
+			self.containable.reparent().await;
 		}
 		let Some(grab_actor) = self.grab_action.actor() else {
 			return;
@@ -323,7 +318,7 @@ impl PenInput {
 			.actor()
 			.is_some_and(|actor| self.move_action.currently_acting().contains(actor));
 		let color = match (mode, grabbing) {
-			(Mode::Reparent, false) => rgba!(0.015686, 0.992157, 0.298039, 1.0).to_linear(),
+			(Mode::Translate, false) => rgba!(0.015686, 0.992157, 0.298039, 1.0).to_linear(),
 			(Mode::MonadoOffset, false) => rgba!(0.361, 0.161, 0.514, 1.0).to_linear(),
 			(Mode::Disabled, _) => rgba_linear!(0.033104762, 0.033104762, 0.033104762, 1.),
 			(_, true) => rgba_linear!(0., 0.26223028, 1., 1.),

@@ -1,6 +1,4 @@
-use std::{
-	f32::consts::{FRAC_PI_2, PI},
-};
+use std::f32::consts::{FRAC_PI_2, PI};
 
 use glam::Quat;
 use stardust_xr_fusion::{
@@ -94,7 +92,6 @@ impl ModeButton {
 		)
 		.await
 		.ok()?;
-
 
 		let (tx, rx) = mpsc::channel();
 
