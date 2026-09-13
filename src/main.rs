@@ -4,7 +4,7 @@ mod monado_movement;
 mod solar_sailer;
 mod translate_movement;
 
-use gluon::Liveness;
+use gluon_ipc::Liveness;
 use input::Input;
 use solar_sailer::{Mode, SolarSailer};
 use stardust_xr_fusion::{client::Client, project_local_resources};

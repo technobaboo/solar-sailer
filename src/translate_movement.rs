@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use glam::Vec3;
-use gluon::{Interface, Node, RefExt};
+use gluon_ipc::{Interface, Node, RefExt};
 use stardust_xr_fusion::{
 	client::{Client, ClientHandler},
 	fields::{Field, FieldExt, FieldRef, FieldSample, Shape},
@@ -19,7 +19,7 @@ pub struct TranslateMovement {
 	_spatial: Spatial,
 	_query: ZoneQueryHandle,
 }
-#[derive(gluon::Handler)]
+#[derive(gluon_ipc::Handler)]
 struct Translatables(RwLock<HashMap<QueryableId, Translatable>>);
 impl Translatables {
 	fn find(interfaces: Vec<QueriedInterface>) -> Option<Translatable> {
@@ -40,7 +40,7 @@ impl Translatables {
 impl ZoneQueryHandlerHandler for Translatables {
 	async fn entered(
 		&self,
-		_ctx: gluon::Context,
+		_ctx: gluon_ipc::Context,
 		id: QueryableId,
 		_field: FieldRef,
 		_spatial: SpatialRef,
@@ -53,7 +53,7 @@ impl ZoneQueryHandlerHandler for Translatables {
 
 	async fn interfaces_changed(
 		&self,
-		_ctx: gluon::Context,
+		_ctx: gluon_ipc::Context,
 		id: QueryableId,
 		interfaces: Vec<QueriedInterface>,
 	) {
@@ -62,14 +62,14 @@ impl ZoneQueryHandlerHandler for Translatables {
 
 	async fn moved(
 		&self,
-		_ctx: gluon::Context,
+		_ctx: gluon_ipc::Context,
 		_id: QueryableId,
 		_relative_position: Vec3F,
 		_sample: FieldSample,
 	) {
 	}
 
-	async fn left(&self, _ctx: gluon::Context, id: QueryableId) {
+	async fn left(&self, _ctx: gluon_ipc::Context, id: QueryableId) {
 		self.0.write().await.remove(&id);
 	}
 }

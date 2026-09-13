@@ -1,27 +1,27 @@
 [package]
 name = "solar-sailer"
-version = "0.51.0"
+version = "0.52.0"
 edition = "2024"
 
 [dependencies]
-glam = { version = "0.27.0", features = ["mint"] }
+glam = { version = "0.33.7", features = ["mint"] }
 mint = "0.5.9"
 tokio = { version = "1.32.0", features = ["rt", "tokio-macros", "sync"] }
 tracing = "0.1.41"
 tokio-stream = "0.1.17"
 tracing-subscriber = { version = "0.3.19", features = ["tracing"] }
 
-[dependencies.gluon]
-git = "https://github.com/technobaboo/gluon.git"
-branch = "refactor/strongipc"
+[dependencies.gluon-ipc]
+version = "0.1.0"
+# git = "https://github.com/technobaboo/gluon.git"
 
 [dependencies.stardust-xr-fusion]
-git = "https://github.com/StardustXR/core.git"
-branch = "refactor/strongipc"
+version = "0.52.0"
+# git = "https://github.com/StardustXR/core.git"
 
 [dependencies.stardust-xr-molecules]
-git = "https://github.com/StardustXR/molecules.git"
-branch = "refactor/strongipc"
+version = "0.52.0"
+# git = "https://github.com/StardustXR/molecules.git"
 
 [dependencies.libmonado]
 git = "https://github.com/technobaboo/libmonado-rs.git"
